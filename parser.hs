@@ -1,102 +1,173 @@
--- Defining a Parser monad
-newtype Parser a = Parser { runParser :: String -> Maybe (a, String) }
+module Parser where
+    import Data.Char (ord)
+    import ParserCore
+    import Ast 
+    import Helpers (isDigit, isAlpha)
+    
+    -- Parsers that are used to build more concrete parsers
 
-instance Functor Parser where 
-    fmap :: (a -> b) -> Parser a -> Parser b
-    fmap f (Parser x) = Parser $ \s -> do 
-        (x', s') <- x s
-        return (f x', s')
+    char :: Char -> Parser Char --OK
+    char c = sat (c==)
 
-instance Applicative Parser where 
-    pure :: a -> Parser a
-    pure x = Parser $ \s -> Just (x,s)
-    (Parser f) <*> (Parser x) = Parser $ \s -> do 
-        (f', s1) <- f s 
-        (x', s2) <- x s1
-        return (f' x', s2)
+    string :: String -> Parser String --OK
+    string "" = return "" 
+    string (x:xs) = do
+        char x
+        string xs
+        return (x:xs)
+    many :: Parser a -> Parser [a] --OK
+    many p = manyHelper p +++ return []
+        where manyHelper p = do
+                a <- p
+                as <- many p
+                return (a:as)
 
-instance Monad Parser where
-    (>>=) :: Parser a -> (a -> Parser b) -> Parser b
-    (Parser x) >>= f = Parser $ \s -> do
-        (x', s') <- x s 
-        runParser (f x') s'
+    space :: Parser String 
+    space = many (sat $ \c -> c=='\n' || c=='\t' || c=='\r' || c=='\f' || c=='\v' || c==' ')
 
-instance MonadFail Parser where 
-    fail :: String -> Parser a
-    fail _ = Parser $ const Nothing
+    token :: Parser a -> Parser a
+    token p = do
+        a <- p
+        space
+        return a
 
+    symbol :: String -> Parser String
+    symbol cs = token (string cs)
 
-class (Applicative f) => Alternative f where 
-    empty :: f a
-    ( <|> ) :: f a -> f a -> f a 
-    some :: f a -> f [a]
-    many :: f a -> f [a]
-    some v = some_v -- one or more
-        where many_v = some_v <|> pure []
-              some_v = (:) <$> v <*> many_v 
-    many v = many_v -- zero or more
-        where many_v = some_v <|> pure []
-              some_v = (:) <$> v <*> many_v 
+    -- Parsing ids 
+    ident :: Parser [Char]
+    ident = do 
+        l <- sat isAlpha
+        lsc <- many (sat (\a -> isAlpha a || isDigit a))
+        return (l:lsc)
 
+    identif :: Parser [Char]
+    identif = token ident
 
-instance Alternative Parser where 
-    empty = fail ""
-    (Parser x) <|> (Parser y) = Parser $ \s -> 
-        case x s of 
-            Just x -> Just x
-            Nothing -> y s 
-
-
--- Define grammar of language 
-
--- <rexp> ::= <rexp> <relop> <expr> | <expr>
--- <expr> ::= <expr> <addop> <term> | <term>
--- <term> ::= <term> <mulop> <factor> |< factor>
--- <factor> ::= <var> | <digiti> | ( <expr> )
--- <var> ::= <Identifier>
--- <digiti> ::= <digit> | <digit> <digiti>
--- <digit> ::= 0 | 1 | ... | 9
--- <addop> ::= + | -
--- <mulop> ::= * | /
--- <relop> ::= > | < | =
-
--- <com> ::= <assign> | <seqv> | <cond> | <while> | <declare> | <printe>
--- assign> ::= <
--- identif> ":=" <rexp>
--- <seqv> ::= "{" <com> ";" <com> "}"
--- <cond> ::= "if" <rexp> "then" <com> "else" <com>
--- <while> ::= "while" <rexp> "do" <com>
--- <declare> ::= "declare" <identif> "=" <rexp> "in" <com>
--- <printe> ::= "print" <rexp>
+    -- Parser for vars 
+    var :: Parser Exp
+    var = do Variable <$> identif
 
 
-digit :: Parser Char
-digit = char '0' <|> char '1' <|> char '2' <|> char '3' <|> char '4' <|> char '5' <|> char '6' <|> char '7' <|> char '8' <|> char '9'
+    chainl :: Parser a -> Parser (a -> a -> a) -> a -> Parser a
+    chainl p op a = (p `chainl1` op) +++ return a
 
-digiti :: Parser [Char]
-digiti = some digit
+    chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+    p `chainl1` op = do { a <- p; rest a }
+        where rest a = ( do  
+                f <- op
+                b <- p
+                rest (f a b) 
+                ) +++ return a
 
-addop :: Parser Char 
-addop = char '+' <|> char '-'
 
-mulop :: Parser Char
-mulop = char '*' <|> char '/'
+    -- building grammar 
 
-relop :: Parser Char 
-relop = char '>' <|> char '<' <|> char '='
+    digit :: Parser Exp 
+    digit = do 
+        x <- token (sat isDigit) 
+        return (Constant ( ord x - ord '0'))
 
-char :: Char -> Parser Char 
-char c = Parser $ \s -> helper s
-    where helper [] = Nothing 
-          helper (x:xs) | x == c = Just (c, xs)
-                        | otherwise = Nothing
+    digiti :: Parser Exp 
+    digiti = do 
+        p <- digit
+        l <- many digit;
+        return (foldl (\a b -> let Constant nra = a
+                                   Constant nrb = b 
+                                   in Constant (10*nra + nrb)) (Constant 0) (p:l)
+                                )
+    rexp :: Parser Exp 
+    rexp = expr `chainl1` relop
 
-string :: String -> Parser String 
-string = mapM char 
+    expr :: Parser Exp
+    expr = term `chainl1` addop
 
-space :: Parser Char 
-space = char ' ' <|> char '\n' <|> char '\r' <|> char '\t'
+    term :: Parser Exp 
+    term = factor `chainl1` mulop 
 
-ss = many space 
+    -- Parser for factor 
+    factor :: Parser Exp 
+    factor = var +++ digiti +++ do 
+        symbol "("
+        n <- rexp
+        symbol ")"
+        return n
 
-parseHW = (,) <$> (string "Hello" <* ss) <*> string "World"
+    addop :: Parser (Exp -> Exp -> Exp)
+    addop = do { symbol "-" ; return Minus } +++ do  do { symbol "+" ; return Plus }
+
+    mulop :: Parser (Exp -> Exp -> Exp)
+    mulop = do { symbol "*"; return Times} +++ do { symbol "/"; return Div}
+
+    relop :: Parser (Exp -> Exp -> Exp)
+    relop = do { symbol ">"; return Greater} +++ do { symbol "<"; return Less} +++ do { symbol "="; return Equal}
+
+
+    -- Commands 
+    printe :: Parser Com 
+    printe = do 
+        symbol "print"
+        x <- rexp 
+        return $ Print x
+
+    assign :: Parser Com 
+    assign = do  
+        x <- identif 
+        symbol ":="
+        e <- rexp
+        return $ Assign x e
+
+    seqv :: Parser Com 
+    seqv = do
+        symbol "{"
+        c <- com
+        symbol ";"
+        d <- com
+        symbol "}"
+        return $ Seq c d
+
+
+    cond :: Parser Com 
+    cond = do 
+        symbol "if"
+        e <- rexp 
+        symbol "then"
+        c <- com
+        symbol "else"
+        d <- com
+        return $ Cond e c d 
+
+    while :: Parser Com 
+    while = do 
+        symbol "while"
+        e <- rexp 
+        symbol "do"
+        c <- com 
+        return $ While e c 
+
+    declare = do
+        symbol "declare"
+        x <- identif
+        symbol "="
+        e <- rexp 
+        symbol "in"
+        c <- com
+        return (Declare x e c)
+
+    com :: Parser Com 
+    com = assign +++ seqv +++ cond +++ while +++ declare +++ printe 
+
+
+    test_str = "{x:=10;y:=20}"
+
+    test_str2 = "declare x = 150 in print x"
+
+    test_str3 ="declare x = 150 in declare y = 200 in {while x > 0 do { x:=x-1; y:=y-1 }; print y}"
+
+    test_parser = do 
+        symbol "declare"
+
+    run_test = parse com test_str3
+
+
+    ast = Declare "x" (Constant 150) (Declare "y" (Constant 200) (Seq (While (Greater (Variable "x") (Constant 0)) (Seq (Assign "x" (Minus (Variable "x") (Constant 1))) (Assign "y" (Minus (Variable "y") (Constant 1))))) (Print (Variable "y"))))
