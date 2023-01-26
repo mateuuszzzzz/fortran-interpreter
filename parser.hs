@@ -4,70 +4,19 @@ module Parser where
     import Ast 
     import Helpers (isDigit, isAlpha)
     
-    -- Parsers that are used to build more concrete parsers
+    -- Bulding grammar of language 
 
-    char :: Char -> Parser Char --OK
-    char c = sat (c==)
-
-    string :: String -> Parser String --OK
-    string "" = return "" 
-    string (x:xs) = do
-        char x
-        string xs
-        return (x:xs)
-    many :: Parser a -> Parser [a] --OK
-    many p = manyHelper p +++ return []
-        where manyHelper p = do
-                a <- p
-                as <- many p
-                return (a:as)
-
-    space :: Parser String 
-    space = many (sat $ \c -> c=='\n' || c=='\t' || c=='\r' || c=='\f' || c=='\v' || c==' ')
-
-    token :: Parser a -> Parser a
-    token p = do
-        a <- p
-        space
-        return a
-
-    symbol :: String -> Parser String
-    symbol cs = token (string cs)
-
-    -- Parsing ids 
-    ident :: Parser [Char]
-    ident = do 
-        l <- sat isAlpha
-        lsc <- many (sat (\a -> isAlpha a || isDigit a))
-        return (l:lsc)
-
-    identif :: Parser [Char]
-    identif = token ident
-
-    -- Parser for vars 
+    -- Variables
     var :: Parser Exp
     var = do Variable <$> identif
 
-
-    chainl :: Parser a -> Parser (a -> a -> a) -> a -> Parser a
-    chainl p op a = (p `chainl1` op) +++ return a
-
-    chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
-    p `chainl1` op = do { a <- p; rest a }
-        where rest a = ( do  
-                f <- op
-                b <- p
-                rest (f a b) 
-                ) +++ return a
-
-
-    -- building grammar 
-
+    -- Digits
     digit :: Parser Exp 
     digit = do 
         x <- token (sat isDigit) 
         return (Constant ( ord x - ord '0'))
 
+    -- Numbers
     digiti :: Parser Exp 
     digiti = do 
         p <- digit
@@ -76,12 +25,15 @@ module Parser where
                                    Constant nrb = b 
                                    in Constant (10*nra + nrb)) (Constant 0) (p:l)
                                 )
+    -- Expression with relational operator
     rexp :: Parser Exp 
     rexp = expr `chainl1` relop
 
+    --Expression with additive operator
     expr :: Parser Exp
     expr = term `chainl1` addop
 
+    --Expression with multiplicative operator
     term :: Parser Exp 
     term = factor `chainl1` mulop 
 
@@ -93,6 +45,7 @@ module Parser where
         symbol ")"
         return n
 
+    -- Arithmetic operators
     addop :: Parser (Exp -> Exp -> Exp)
     addop = do { symbol "-" ; return Minus } +++ do  do { symbol "+" ; return Plus }
 
@@ -137,13 +90,25 @@ module Parser where
         d <- com
         return $ Cond e c d 
 
+    armif :: Parser Com
+    armif = do
+        symbol "IFF"
+        e <- rexp
+        symbol "negative"
+        n <- com
+        symbol "zero"
+        z <- com
+        symbol "positive"
+        p <- com
+        return $ ArmIf e n z p
+
     while :: Parser Com 
     while = do 
         symbol "while"
         e <- rexp 
         symbol "do"
         c <- com 
-        return $ While e c 
+        return $ While e c
 
     declare = do
         symbol "declare"
@@ -170,4 +135,4 @@ module Parser where
     run_test = parse com test_str3
 
 
-    ast = Declare "x" (Constant 150) (Declare "y" (Constant 200) (Seq (While (Greater (Variable "x") (Constant 0)) (Seq (Assign "x" (Minus (Variable "x") (Constant 1))) (Assign "y" (Minus (Variable "y") (Constant 1))))) (Print (Variable "y"))))
+    ast = [(ArmIf (Greater (Variable "x") (Constant 0)) (Print (Minus (Times (Constant 2) (Constant 4)) (Variable "x"))) (Print (Variable "x")) (Print (Variable "x")),"")]

@@ -1,8 +1,8 @@
-module ParserCore where 
-    import Ast () 
+module ParserCore (Parser (Parser), parse, item, (+++), sat, char, string, many, space, token, symbol, ident, identif, chainl, chainl1) where 
+    import Helpers (isDigit, isAlpha)
     import Data.Char (ord)
     
-    -- Parser definition. Derived from `https://www.cs.nott.ac.uk/~pszgmh/monparsing.pdf`
+    -- Parser definition and logic. Mostly derived from `https://www.cs.nott.ac.uk/~pszgmh/monparsing.pdf`
     newtype Parser a = Parser (String -> [(a, String)])
 
     -- Similar behaviour as `Interpreter.unwrap`
@@ -53,4 +53,56 @@ module ParserCore where
     sat p = do
         c <- item
         if p c then return c else mzero
+
+    -- Simple parsers
+    char :: Char -> Parser Char --OK
+    char c = sat (c==)
+
+    string :: String -> Parser String --OK
+    string "" = return "" 
+    string (x:xs) = do
+        char x
+        string xs
+        return (x:xs)
+    
+    many :: Parser a -> Parser [a] --OK
+    many p = manyHelper p +++ return []
+        where manyHelper p = do
+                a <- p
+                as <- many p
+                return (a:as)
+
+    space :: Parser String 
+    space = many (sat $ \c -> c=='\n' || c=='\t' || c=='\r' || c=='\f' || c=='\v' || c==' ')  --OK
+
+    token :: Parser a -> Parser a
+    token p = do
+        a <- p
+        space
+        return a
+
+    symbol :: String -> Parser String
+    symbol cs = token (string cs)
+
+    ident :: Parser [Char]
+    ident = do 
+        l <- sat isAlpha
+        lsc <- many (sat (\a -> isAlpha a || isDigit a))
+        return (l:lsc)
+
+    identif :: Parser [Char]
+    identif = token ident
+
+    chainl :: Parser a -> Parser (a -> a -> a) -> a -> Parser a
+    chainl p op a = (p `chainl1` op) +++ return a
+
+    chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+    p `chainl1` op = do { a <- p; rest a }
+        where rest a = ( do  
+                f <- op
+                b <- p
+                rest (f a b) 
+                ) +++ return a
+
+
     

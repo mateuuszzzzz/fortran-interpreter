@@ -1,5 +1,5 @@
-module Ast (Exp (Constant, Variable, Minus, Greater, Times, Div, Plus, Less, Equal), Com (Assign, Seq, Cond, While, Declare, Print)) where 
--- This file defines AST of language 
+module Ast (Exp (Constant, Variable, Minus, Greater, Times, Div, Plus, Less, Equal), Com (Assign, Seq, Cond, ArmIf, While, Declare, Print)) where 
+-- This file defines AST of the language 
 
 data Exp =  Constant Int
             | Variable String
@@ -12,10 +12,13 @@ data Exp =  Constant Int
             | Equal Exp Exp 
             deriving Show
 
-data Com =  Assign String Exp
-            | Seq Com Com
-            | Cond Exp Com Com
-            | While Exp Com
-            | Declare String Exp Com
-            | Print Exp
-            deriving Show 
+data Com =  Assign String Exp -- OK
+            | Seq Com Com -- OK
+            | Cond Exp Com Com -- OK
+            | ArmIf Exp Com Com Com -- OK
+            | While Exp Com -- OK
+            | Declare String Exp Com -- OK
+            | Print Exp -- OK
+            | Jump String
+            | Label String
+            deriving Show

@@ -89,34 +89,32 @@ module Interpreter where
 
     interpret :: Com -> Index -> StateMonad ()
     interpret stmt index = case stmt of 
-    Assign name e -> let loc = position name index 
-                     in do 
-                        v <- eval e index
-                        write loc v
-    Seq s1 s2 -> do 
-        x <- interpret s1 index
-        y <- interpret s2 index
-        return ()
-    Cond e s1 s2 -> do 
-        x <- eval e index
-        if x == 1
-        then interpret s1 index
-        else interpret s2 index
-
-    While e b -> let loop () = do {
-        v <- eval e index;
-        if v==0 then return ()
-        else do {
-            interpret b index;
-            loop()
-        }
-    } in loop()
-    Declare nm e stmt -> do
-        v <- eval e index
-        push v
-        interpret stmt (nm:index)
-        pop
-    Print e -> do
-        v <- eval e index
-        output v
+        Assign name e -> let loc = position name index in do 
+            v <- eval e index
+            write loc v
+        Seq s1 s2 -> do 
+            x <- interpret s1 index
+            y <- interpret s2 index
+            return ()
+        Cond e s1 s2 -> do 
+            x <- eval e index
+            if x == 1
+                then interpret s1 index
+                else interpret s2 index
+        While e b -> let loop () = do {
+            v <- eval e index;
+            if v==0 then return ()
+            else do {
+                interpret b index;
+                loop()
+                }
+            } in loop()
+        Declare nm e stmt -> do
+             v <- eval e index
+             push v
+             interpret stmt (nm:index)
+             pop
+        Print e -> do
+             v <- eval e index
+             output v
 
