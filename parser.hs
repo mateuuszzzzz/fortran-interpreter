@@ -1,4 +1,4 @@
-module Parser where
+module Parser (languageParser) where
     import Data.Char (ord)
     import ParserCore
     import Ast
@@ -46,7 +46,7 @@ module Parser where
     factor :: Parser Exp 
     factor = var +++ digiti +++ do 
         symbol "("
-        n <- rexp
+        n <- lexp
         symbol ")"
         return n
 
@@ -80,14 +80,20 @@ module Parser where
     printe :: Parser Com 
     printe = do 
         symbol "print"
-        x <- rexp 
+        x <- lexp 
         return $ Print x
+
+    reade :: Parser Com
+    reade = do 
+        symbol "read"
+        var <- identif 
+        return $ Read var
 
     assign :: Parser Com 
     assign = do  
         x <- identif 
         symbol ":="
-        e <- rexp
+        e <- lexp
         return $ Assign x e
 
     seqv :: Parser Com 
@@ -103,7 +109,7 @@ module Parser where
     cond :: Parser Com 
     cond = do 
         symbol "if"
-        e <- rexp 
+        e <- lexp 
         symbol "then"
         c <- com
         symbol "else"
@@ -113,7 +119,7 @@ module Parser where
     armif :: Parser Com
     armif = do
         symbol "IFF"
-        e <- rexp
+        e <- lexp
         symbol "negative"
         n <- com
         symbol "zero"
@@ -125,7 +131,7 @@ module Parser where
     while :: Parser Com 
     while = do 
         symbol "while"
-        e <- rexp 
+        e <- lexp 
         symbol "do"
         c <- com 
         return $ While e c
@@ -136,7 +142,7 @@ module Parser where
         symbol "["
         x <- identif
         symbol "="
-        e <- rexp
+        e <- lexp
         symbol ";"
         end <- digiti
         symbol ";"
@@ -151,7 +157,7 @@ module Parser where
         symbol "declare"
         x <- identif
         symbol "="
-        e <- rexp 
+        e <- lexp 
         symbol "in"
         c <- com
         return (Declare x e c)
@@ -160,16 +166,19 @@ module Parser where
     com = assign +++ seqv +++ cond +++ while +++ declare +++ printe +++ label +++ jump +++ doloop
 
 
+    languageParser :: String -> Com 
+    languageParser str = fst(parse com str)
+
     test_str = "{x:=10;y:=20}"
 
     test_str2 = "declare x = 150 in print x"
 
-    test_str3 ="declare x = 150 in declare y = 200 in {while x > 0 do jump: y; label: y}"
+    test_str3 ="declare x = 150 in declare y = 200 in {while ((x+1 > 0) || (y-10) > 0) && (x*x > 20) do jump: y; label: y}"
 
     test_parser = do 
         symbol "declare"
 
-    run_test = parse com test_doloop
+    run_test = parse com test_str3
 
     test_doloop = "Do [ x=10; 20; 100] then print x"
 

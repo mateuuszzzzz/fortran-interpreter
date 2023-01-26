@@ -1,35 +1,18 @@
-module PrettyPrinting where
+module PrettyPrinting (RegisterOP (STACK_PUSH, WHILE, STACK_MODIFY, PRINT, STACK_DELETE, IF, THEN, ELSE, ARMIF, NEGATIVEIF, ZEROIF, POSITIVEIF, JUMP, LABEL, READ), Instructions, generateCodeFromAST, astToInstructions) where
     import Ast
-    import Parser 
-    import ParserCore 
     
     -- Since this language has goto statements it is quite difficult to operate on the AST.
+    -- Also, it would be difficult to create an interpreter that accepts any proper code (different number of line breaks, spaces etc., because of many edge cases)
     -- Solution to this problem is to interpret code line by line. However we have to guarantee
     -- that the code is formatted properly
-    -- We cannot expect a user to always write such code so we can convert AST back to String that is formatted properly.
-    -- Such String can be easily interpreted line by line.
+    -- We cannot expect a user to always write such code. We can convert AST to list of operations (for a given ast, list of operations always remains the same)
     -- Also handling input/output becomes easier, since we don't have to use liftIO (because for an interpreter we would normally use a StateMonad)
-
-    -- This generates proper AST of our language 
-    generateAST :: String -> Com
-    generateAST code = fst $ head $ parse com code
-
-    -- expToStr :: Exp -> String
-    -- expToStr (Minus exp1 exp2) = "(" ++ expToStr exp1 ++ "-" ++ expToStr exp2 ++ ")"
-    -- expToStr (Greater exp1 exp2) = "(" ++ expToStr exp1 ++ ">" ++ expToStr exp2 ++ ")" 
-    -- expToStr (Less exp1 exp2) = "(" ++ expToStr exp1 ++ "<" ++ expToStr exp2 ++ ")"
-    -- expToStr (Plus exp1 exp2) = "(" ++ expToStr exp1 ++ "+" ++ expToStr exp2 ++ ")"
-    -- expToStr (Times exp1 exp2) = "(" ++ expToStr exp1 ++ "*" ++ expToStr exp2 ++ ")" 
-    -- expToStr (Div exp1 exp2) = "(" ++ expToStr exp1 ++ "/" ++ expToStr exp2 ++ ")"   
-    -- expToStr (Equal exp1 exp2) = "(" ++ expToStr exp1 ++ "==" ++ expToStr exp2 ++ ")" 
-    -- expToStr (Constant n) = show n
-    -- expToStr (Variable x) = x
 
     -- This should simplify pattern matching a bit (in the interpreter)
     data RegisterOP = STACK_PUSH String Exp 
                     | WHILE Exp
                     | STACK_MODIFY String Exp
-                    | PRINT Exp
+                    | PRINT Exp -- STDOUT
                     | STACK_DELETE String
                     | IF Exp -- Internal IF that is used in conversion from DO LOOP to IF+JUMP mechanism (internally all loops are goto's statements)
                     | THEN
@@ -40,17 +23,23 @@ module PrettyPrinting where
                     | POSITIVEIF
                     | JUMP String
                     | LABEL String
-                    | READ 
-                    | WRITE
+                    | READ String -- STDIN (read to variable)
                     deriving Show 
 
 
+    type Instructions = [(Int, RegisterOP)]
 
-    -- Final code is a list of registers
-    generateCodeFromAST :: Com -> [(Int, RegisterOP)] -> Int -> [(Int, RegisterOP)]
+    -- Final code is a list of register ops
+    generateCodeFromAST :: Com -> Instructions -> Int -> Instructions
     generateCodeFromAST (Assign name exp) acc line = acc ++ [(line, STACK_MODIFY name exp)]
 
     generateCodeFromAST (Print exp) acc line = acc ++ [(line, PRINT exp)]
+
+    generateCodeFromAST (Read name) acc line = acc ++ [(line, READ name)]
+
+    generateCodeFromAST (Jump label) acc line = acc ++ [(line, JUMP label)]
+
+    generateCodeFromAST (Label label) acc line = acc ++ [(line, LABEL label)]
 
     generateCodeFromAST (Declare name exp com) acc line = acc ++ [(line, STACK_PUSH name exp)] ++ comArray ++ machineInstruction
         where comArray = generateCodeFromAST com [] (line+1)
@@ -72,22 +61,25 @@ module PrettyPrinting where
     generateCodeFromAST (While exp com) acc line = acc ++ [(line, WHILE exp)] ++ comArray
         where comArray = generateCodeFromAST com [] (line+1)
 
-    generateCodeFromAST (DoLoop varName init end step com) acc line = acc ++ [(line, STACK_PUSH varName init)] ++ [(line+1, LABEL labelName)] ++ comArray ++ gotoMechanism
+    generateCodeFromAST (DoLoop varName init end step com) acc line = acc ++ [(line, STACK_PUSH varName init)] ++ [(line+1, LABEL labelName)] ++ comArray ++ gotoMechanism -- Here is an example of swapping loop with goto (loop labels has special signature)
         where labelName = "loop_" ++ show (line+1)
               comArray = generateCodeFromAST com [] (line + 2)
               comArrayLength = length comArray
               offset = line + 2 + comArrayLength
               gotoMechanism = [(offset, IF (Less (Variable varName) end)), (offset+1, THEN), (offset+2, (STACK_MODIFY varName (Plus (Variable varName) step))), (offset+3, JUMP labelName), (offset+4, ELSE), (offset+5, STACK_DELETE varName)]
 
+    astToInstructions :: Com -> Instructions
+    astToInstructions ast = generateCodeFromAST ast [] 0
+
+    -- testAST = (ArmIf (Constant 0) (Print (Constant 1)) (Seq (Print (Constant 1)) (Print (Constant 2137))) (Print (Constant 3)) )
+    -- testAST2 = (ArmIf (Greater (Variable "x") (Constant 0)) (Print (Minus (Times (Constant 2) (Constant 4)) (Variable "x"))) (Print (Variable "x")) (Print (Variable "x")),"")
+    -- testAST3 = Declare "x" (Constant 150) (Declare "y" (Constant 200) (Seq (While (Greater (Variable "x") (Constant 0)) (Seq (Assign "x" (Minus (Variable "x") (Constant 1))) (Assign "y" (Minus (Variable "y") (Constant 1))))) (Print (Variable "y"))))
 
 
-    testAST = (ArmIf (Constant 0) (Print (Constant 1)) (Seq (Print (Constant 1)) (Print (Constant 2137))) (Print (Constant 3)) )
-    testAST2 = (ArmIf (Greater (Variable "x") (Constant 0)) (Print (Minus (Times (Constant 2) (Constant 4)) (Variable "x"))) (Print (Variable "x")) (Print (Variable "x")),"")
-    testAST3 = Declare "x" (Constant 150) (Declare "y" (Constant 200) (Seq (While (Greater (Variable "x") (Constant 0)) (Seq (Assign "x" (Minus (Variable "x") (Constant 1))) (Assign "y" (Minus (Variable "y") (Constant 1))))) (Print (Variable "y"))))
+    -- testAST4 = Declare "x" (Constant 150) (Declare "y" (Constant 200) (Seq (While (And (Or (Greater (Plus (Variable "x") (Constant 1)) (Constant 0)) (Greater (Minus (Variable "y") (Constant 10)) (Constant 0))) (Greater (Times (Variable "x") (Variable "x")) (Constant 20))) (Jump "y")) (Label "y")))
 
-
-    testDoLoop = DoLoop "x" (Constant 10) (Constant 20) (Constant 100) (Print (Variable "x"))
-    main :: IO ()
-    main = do
-        mapM_ putStrLn (map show (generateCodeFromAST testDoLoop [] 0))
-        return ()
+    -- testDoLoop = DoLoop "x" (Constant 10) (Constant 20) (Constant 100) (Print (Variable "x"))
+    -- main :: IO ()
+    -- main = do
+    --     mapM_ putStrLn (map show (generateCodeFromAST testDoLoop [] 0))
+    --     return ()
