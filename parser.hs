@@ -1,7 +1,7 @@
 module Parser where
     import Data.Char (ord)
     import ParserCore
-    import Ast 
+    import Ast
     import Helpers (isDigit, isAlpha)
     
     -- Bulding grammar of language 
@@ -25,6 +25,11 @@ module Parser where
                                    Constant nrb = b 
                                    in Constant (10*nra + nrb)) (Constant 0) (p:l)
                                 )
+    -- Expression with logic operator
+
+    lexp :: Parser Exp
+    lexp = rexp `chainl1` logicop
+    
     -- Expression with relational operator
     rexp :: Parser Exp 
     rexp = expr `chainl1` relop
@@ -55,8 +60,23 @@ module Parser where
     relop :: Parser (Exp -> Exp -> Exp)
     relop = do { symbol ">"; return Greater} +++ do { symbol "<"; return Less} +++ do { symbol "="; return Equal}
 
+    logicop :: Parser (Exp -> Exp -> Exp)
+    logicop = do { symbol "||"; return Or} +++ do {symbol "&&"; return And}
+
 
     -- Commands 
+    jump :: Parser Com
+    jump = do 
+        symbol "jump:"
+        label <- identif
+        return $ Jump label
+
+    label :: Parser Com 
+    label = do 
+        symbol "label:"
+        label <- identif
+        return $ Label label
+
     printe :: Parser Com 
     printe = do 
         symbol "print"
@@ -110,6 +130,23 @@ module Parser where
         c <- com 
         return $ While e c
 
+    doloop :: Parser Com 
+    doloop = do
+        symbol "Do"
+        symbol "["
+        x <- identif
+        symbol "="
+        e <- rexp
+        symbol ";"
+        end <- digiti
+        symbol ";"
+        step <- digiti
+        symbol "]"
+        symbol "then"
+        c <- com
+        return $ DoLoop x e end step c
+
+
     declare = do
         symbol "declare"
         x <- identif
@@ -120,19 +157,21 @@ module Parser where
         return (Declare x e c)
 
     com :: Parser Com 
-    com = assign +++ seqv +++ cond +++ while +++ declare +++ printe 
+    com = assign +++ seqv +++ cond +++ while +++ declare +++ printe +++ label +++ jump +++ doloop
 
 
     test_str = "{x:=10;y:=20}"
 
     test_str2 = "declare x = 150 in print x"
 
-    test_str3 ="declare x = 150 in declare y = 200 in {while x > 0 do { x:=x-1; y:=y-1 }; print y}"
+    test_str3 ="declare x = 150 in declare y = 200 in {while x > 0 do jump: y; label: y}"
 
     test_parser = do 
         symbol "declare"
 
-    run_test = parse com test_str3
+    run_test = parse com test_doloop
+
+    test_doloop = "Do [ x=10; 20; 100] then print x"
 
 
     ast = [(ArmIf (Greater (Variable "x") (Constant 0)) (Print (Minus (Times (Constant 2) (Constant 4)) (Variable "x"))) (Print (Variable "x")) (Print (Variable "x")),"")]

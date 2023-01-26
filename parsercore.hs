@@ -43,29 +43,29 @@ module ParserCore (Parser (Parser), parse, item, (+++), sat, char, string, many,
         (c:cs) -> [(c,cs)]
 
     -- Sometimes we need to combine a few parsers and get the first succesful parsing (and discard remaining ones)
-    (+++) :: Parser a -> Parser a -> Parser a --OK
+    (+++) :: Parser a -> Parser a -> Parser a -- OK
     p +++ q = Parser $ \str -> case parse (p `mplus` q) str of
         [] -> []
         (x:_) -> [x]
 
     -- Predicate that allows us to build rules for parsers e.g. using `isDigit :: Char -> Bool` accepts only digits
-    sat :: (Char -> Bool) -> Parser Char --OK
+    sat :: (Char -> Bool) -> Parser Char -- OK
     sat p = do
         c <- item
         if p c then return c else mzero
 
     -- Simple parsers
-    char :: Char -> Parser Char --OK
+    char :: Char -> Parser Char -- OK
     char c = sat (c==)
 
-    string :: String -> Parser String --OK
+    string :: String -> Parser String -- OK
     string "" = return "" 
     string (x:xs) = do
         char x
         string xs
         return (x:xs)
     
-    many :: Parser a -> Parser [a] --OK
+    many :: Parser a -> Parser [a] -- OK
     many p = manyHelper p +++ return []
         where manyHelper p = do
                 a <- p
@@ -73,7 +73,7 @@ module ParserCore (Parser (Parser), parse, item, (+++), sat, char, string, many,
                 return (a:as)
 
     space :: Parser String 
-    space = many (sat $ \c -> c=='\n' || c=='\t' || c=='\r' || c=='\f' || c=='\v' || c==' ')  --OK
+    space = many (sat $ \c -> c=='\n' || c=='\t' || c=='\r' || c=='\f' || c=='\v' || c==' ')  -- OK
 
     token :: Parser a -> Parser a
     token p = do
