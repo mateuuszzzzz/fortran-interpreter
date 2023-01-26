@@ -1,5 +1,4 @@
 module Parser (languageParser) where
-    import Data.Char (ord)
     import ParserCore
     import Ast
     import Helpers (isDigit, isAlpha)
@@ -14,7 +13,7 @@ module Parser (languageParser) where
     digit :: Parser Exp 
     digit = do 
         x <- token (sat isDigit) 
-        return (Constant ( ord x - ord '0'))
+        return (Constant ( read [x] :: Float))
 
     -- Numbers
     digiti :: Parser Exp 
@@ -167,7 +166,7 @@ module Parser (languageParser) where
 
 
     languageParser :: String -> Com 
-    languageParser str = fst(parse com str)
+    languageParser str = fst . head $ (parse com str)
 
     test_str = "{x:=10;y:=20}"
 

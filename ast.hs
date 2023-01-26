@@ -1,7 +1,7 @@
 module Ast (Exp (Constant, Variable, Minus, Greater, Times, Div, Plus, Less, Equal, Or, And), Com (Assign, Seq, Cond, ArmIf, While, Declare, Print, Jump, Label, DoLoop, Read)) where 
 -- This file defines AST of the language 
 
-data Exp =  Constant Int
+data Exp =  Constant Float
             | Variable String
             | Minus Exp Exp
             | Greater Exp Exp

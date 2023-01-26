@@ -1,0 +1,7 @@
+declare x = 150 in 
+    declare y = 200 in 
+                    {
+                        while ((x+1 > 0) || (y-10) > 0) && (x*x > 20) do 
+                        jump: y; 
+                        label: y
+                    }

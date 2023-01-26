@@ -1,4 +1,4 @@
-module PrettyPrinting (RegisterOP (STACK_PUSH, WHILE, STACK_MODIFY, PRINT, STACK_DELETE, IF, THEN, ELSE, ARMIF, NEGATIVEIF, ZEROIF, POSITIVEIF, JUMP, LABEL, READ), Instructions, generateCodeFromAST, astToInstructions) where
+module PrettyPrinting (RegisterOP (STACK_PUSH, STACK_MODIFY, PRINT, STACK_DELETE, IF, THEN, ELSE, ARMIF, NEGATIVEIF, ZEROIF, POSITIVEIF, JUMP, LABEL, READ, ENDPROG), Instructions, Instruction, generateCodeFromAST, astToInstructions) where
     import Ast
     
     -- Since this language has goto statements it is quite difficult to operate on the AST.
@@ -9,25 +9,26 @@ module PrettyPrinting (RegisterOP (STACK_PUSH, WHILE, STACK_MODIFY, PRINT, STACK
     -- Also handling input/output becomes easier, since we don't have to use liftIO (because for an interpreter we would normally use a StateMonad)
 
     -- This should simplify pattern matching a bit (in the interpreter)
-    data RegisterOP = STACK_PUSH String Exp 
-                    | WHILE Exp
-                    | STACK_MODIFY String Exp
-                    | PRINT Exp -- STDOUT
-                    | STACK_DELETE String
-                    | IF Exp -- Internal IF that is used in conversion from DO LOOP to IF+JUMP mechanism (internally all loops are goto's statements)
+    data RegisterOP = STACK_PUSH String Exp -- OK
+                    | STACK_MODIFY String Exp -- OK
+                    | PRINT Exp -- STDOUT -- OK 
+                    | STACK_DELETE String -- OK
+                    | IF Exp Int Int -- Internal IF that is used in conversion from DO LOOP to IF+JUMP mechanism (internally all loops are goto's statements)
                     | THEN
                     | ELSE
-                    | ARMIF Exp -- Arithmetic IF
-                    | NEGATIVEIF
+                    | ARMIF Exp Int Int Int -- Arithmetic IF
+                    | NEGATIVEIF 
                     | ZEROIF
                     | POSITIVEIF
                     | JUMP String
                     | LABEL String
                     | READ String -- STDIN (read to variable)
+                    | ENDPROG -- End of program
                     deriving Show 
 
 
-    type Instructions = [(Int, RegisterOP)]
+    type Instruction = (Int, RegisterOP)
+    type Instructions = [Instruction]
 
     -- Final code is a list of register ops
     generateCodeFromAST :: Com -> Instructions -> Int -> Instructions
@@ -58,9 +59,6 @@ module PrettyPrinting (RegisterOP (STACK_PUSH, WHILE, STACK_MODIFY, PRINT, STACK
         where com1Array = generateCodeFromAST com1 [] line
               com2Array = generateCodeFromAST com2 [] (line + (length com1Array))
 
-    generateCodeFromAST (While exp com) acc line = acc ++ [(line, WHILE exp)] ++ comArray
-        where comArray = generateCodeFromAST com [] (line+1)
-
     generateCodeFromAST (DoLoop varName init end step com) acc line = acc ++ [(line, STACK_PUSH varName init)] ++ [(line+1, LABEL labelName)] ++ comArray ++ gotoMechanism -- Here is an example of swapping loop with goto (loop labels has special signature)
         where labelName = "loop_" ++ show (line+1)
               comArray = generateCodeFromAST com [] (line + 2)
@@ -69,7 +67,9 @@ module PrettyPrinting (RegisterOP (STACK_PUSH, WHILE, STACK_MODIFY, PRINT, STACK
               gotoMechanism = [(offset, IF (Less (Variable varName) end)), (offset+1, THEN), (offset+2, (STACK_MODIFY varName (Plus (Variable varName) step))), (offset+3, JUMP labelName), (offset+4, ELSE), (offset+5, STACK_DELETE varName)]
 
     astToInstructions :: Com -> Instructions
-    astToInstructions ast = generateCodeFromAST ast [] 0
+    astToInstructions ast = prog ++ progEnd 
+        where prog = (generateCodeFromAST ast [] 0)
+              progEnd = [(length prog, ENDPROG)]
 
     -- testAST = (ArmIf (Constant 0) (Print (Constant 1)) (Seq (Print (Constant 1)) (Print (Constant 2137))) (Print (Constant 3)) )
     -- testAST2 = (ArmIf (Greater (Variable "x") (Constant 0)) (Print (Minus (Times (Constant 2) (Constant 4)) (Variable "x"))) (Print (Variable "x")) (Print (Variable "x")),"")
