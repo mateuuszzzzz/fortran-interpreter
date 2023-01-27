@@ -1,6 +1,6 @@
 module ExpressionInterpreter (evalExpression) where 
     import Ast
-    import ProgramEnviroment
+    import ProgramEnvironment
 
     evalExpression :: Exp -> Stack -> Float
     evalExpression (Constant n) _ = n

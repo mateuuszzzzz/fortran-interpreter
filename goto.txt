@@ -1,0 +1,13 @@
+float n = 1;
+{ read n;
+ { 
+    label: x;
+    if n 
+    negative 
+        {print n; {n:=n+1; jump: x}} 
+    zero 
+        print n
+    positive 
+        {print n; {n:=n-1; jump: x}}
+ }
+}

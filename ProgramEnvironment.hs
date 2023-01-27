@@ -1,4 +1,4 @@
-module ProgramEnviroment (Stack, get, modify, add, delete, NextInstruction, InputAction, OutputAction, Termination, Env) where 
+module ProgramEnvironment (Stack, get, modify, add, delete, NextInstruction, InputAction, OutputAction, Termination, Env) where 
     import PrettyPrinting
 
     type Stack = [(String, Float)] -- Current stack of a program

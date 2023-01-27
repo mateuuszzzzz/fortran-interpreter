@@ -63,39 +63,39 @@ module Parser (languageParser) where
     logicop = do { symbol "||"; return Or} +++ do {symbol "&&"; return And}
 
 
-    -- Commands 
-    jump :: Parser Com
+    -- Statements
+    jump :: Parser Stmt
     jump = do 
         symbol "jump:"
         label <- identif
         return $ Jump label
 
-    label :: Parser Com 
+    label :: Parser Stmt
     label = do 
         symbol "label:"
         label <- identif
         return $ Label label
 
-    printe :: Parser Com 
+    printe :: Parser Stmt
     printe = do 
         symbol "print"
         x <- lexp 
         return $ Print x
 
-    reade :: Parser Com
+    reade :: Parser Stmt
     reade = do 
         symbol "read"
         var <- identif 
         return $ Read var
 
-    assign :: Parser Com 
+    assign :: Parser Stmt
     assign = do  
         x <- identif 
         symbol ":="
         e <- lexp
         return $ Assign x e
 
-    seqv :: Parser Com 
+    seqv :: Parser Stmt 
     seqv = do
         symbol "{"
         c <- com
@@ -104,20 +104,9 @@ module Parser (languageParser) where
         symbol "}"
         return $ Seq c d
 
-
-    cond :: Parser Com 
-    cond = do 
-        symbol "if"
-        e <- lexp 
-        symbol "then"
-        c <- com
-        symbol "else"
-        d <- com
-        return $ Cond e c d 
-
-    armif :: Parser Com
+    armif :: Parser Stmt
     armif = do
-        symbol "IFF"
+        symbol "if"
         e <- lexp
         symbol "negative"
         n <- com
@@ -127,15 +116,7 @@ module Parser (languageParser) where
         p <- com
         return $ ArmIf e n z p
 
-    while :: Parser Com 
-    while = do 
-        symbol "while"
-        e <- lexp 
-        symbol "do"
-        c <- com 
-        return $ While e c
-
-    doloop :: Parser Com 
+    doloop :: Parser Stmt 
     doloop = do
         symbol "Do"
         symbol "["
@@ -143,7 +124,7 @@ module Parser (languageParser) where
         symbol "="
         e <- lexp
         symbol ";"
-        end <- digiti
+        end <- lexp
         symbol ";"
         step <- digiti
         symbol "]"
@@ -152,34 +133,38 @@ module Parser (languageParser) where
         return $ DoLoop x e end step c
 
 
-    declare = do
-        symbol "declare"
+    float = do
+        symbol "float"
         x <- identif
         symbol "="
-        e <- lexp 
-        symbol "in"
+        e <- expr;
+        symbol ";"
         c <- com
-        return (Declare x e c)
+        return (Float x e c)
 
-    com :: Parser Com 
-    com = assign +++ seqv +++ cond +++ while +++ declare +++ printe +++ label +++ jump +++ doloop
-
-
-    languageParser :: String -> Com 
-    languageParser str = fst . head $ (parse com str)
-
-    test_str = "{x:=10;y:=20}"
-
-    test_str2 = "declare x = 150 in print x"
-
-    test_str3 ="declare x = 150 in declare y = 200 in {while ((x+1 > 0) || (y-10) > 0) && (x*x > 20) do jump: y; label: y}"
-
-    test_parser = do 
-        symbol "declare"
-
-    run_test = parse com test_str3
-
-    test_doloop = "Do [ x=10; 20; 100] then print x"
+    com :: Parser Stmt 
+    com = assign +++ seqv +++ float +++ printe +++ reade +++ label +++ jump +++ doloop +++ armif
 
 
-    ast = [(ArmIf (Greater (Variable "x") (Constant 0)) (Print (Minus (Times (Constant 2) (Constant 4)) (Variable "x"))) (Print (Variable "x")) (Print (Variable "x")),"")]
+    languageParser :: String -> Stmt 
+    languageParser str = if length result == 0 then error "Syntax error" else fst . head $ result
+        where result = (parse com str)
+
+    -- test_str = "{x:=10;y:=20}"
+    
+    -- test_arm_if = "IFF 0>1 negative print (0-1) zero print 0 positive print 1"
+
+    -- test_jump = "declare n = 1;{ read n; { label: x; IFF n negative {print n; {n:=n+1; jump: x}} zero print n positive {print n; {n:=n-1; jump: x}} }}"
+    -- -- test_str2 = "declare x = 150 in print x"
+
+    -- -- test_str3 ="declare x = 150 in declare y = 200 in {while ((x+1 > 0) || (y-10) > 0) && (x*x > 20) do jump: y; label: y}"
+
+    -- -- test_parser = do 
+    -- --     symbol "declare"
+
+    -- run_test = parse com test_jump
+
+    -- test_doloop = "Do [ x=10; 20; 100] then print x"
+
+
+    -- ast = [(ArmIf (Greater (Variable "x") (Constant 0)) (Print (Minus (Times (Constant 2) (Constant 4)) (Variable "x"))) (Print (Variable "x")) (Print (Variable "x")),"")]

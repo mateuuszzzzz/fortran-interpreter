@@ -1,0 +1,11 @@
+float f1 = 0;
+float f2 = 1;
+float temp = 1;
+float n = 1;
+{ read n; 
+    { 
+        Do [x=1; n; 1] then 
+        {temp:=f1; {f1:=f2; f2:=temp+f2}};
+        print f2 
+    }
+}

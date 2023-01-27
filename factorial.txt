@@ -1,0 +1,8 @@
+float result = 1;
+float n = 1;
+{ read n; 
+    { 
+        Do [x=2; n; 1] then result:=result * x;
+        print result 
+    }
+}

@@ -1,4 +1,4 @@
-module Ast (Exp (Constant, Variable, Minus, Greater, Times, Div, Plus, Less, Equal, Or, And), Com (Assign, Seq, Cond, ArmIf, While, Declare, Print, Jump, Label, DoLoop, Read)) where 
+module Ast (Exp (Constant, Variable, Minus, Greater, Times, Div, Plus, Less, Equal, Or, And), Stmt (Assign, Seq, ArmIf, Float, Print, Jump, Label, DoLoop, Read)) where 
 -- This file defines AST of the language 
 
 data Exp =  Constant Float
@@ -14,13 +14,11 @@ data Exp =  Constant Float
             | And Exp Exp
             deriving Show
 
-data Com =  Assign String Exp -- OK
-            | Seq Com Com -- OK
-            | Cond Exp Com Com -- OK
-            | ArmIf Exp Com Com Com -- OK
-            | While Exp Com -- OK
-            | DoLoop String Exp Exp Exp Com
-            | Declare String Exp Com -- OK
+data Stmt =  Assign String Exp -- OK
+            | Seq Stmt Stmt -- OK
+            | ArmIf Exp Stmt Stmt Stmt-- OK
+            | DoLoop String Exp Exp Exp Stmt -- OK
+            | Float String Exp Stmt -- OK
             | Print Exp -- OK
             | Jump String --OK
             | Label String --OK
